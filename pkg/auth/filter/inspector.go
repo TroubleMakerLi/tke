@@ -173,21 +173,14 @@ func (i *clusterInspector) Inspect(handler http.Handler, c *genericapiserver.Con
 			return
 		}
 		username, tenantID := authentication.UsernameAndTenantID(ctx)
-		// rbac mode use tenantID as suffix of username
-		if tenantID == "" {
-			strList := strings.Split(username, ":")
-			if len(strList) == 4 && strList[0] == "system" && strList[1] == "serviceaccount" {
-				tenantidStr := strList[len(strList)-1]
-				index := strings.Index(tenantidStr, "-tenant-")
-				if index > 0 {
-					tenantID = tenantidStr[index+8:]
-				}
-			}
-		}
 		log.Infof(" clusterNames: %+v, username: %+v, tenant: %+v, "+
 			"action: %+v, resource: %+v, name: %+v",
 			clusterNames, username, tenantID, tkeAttributes.GetVerb(),
 			tkeAttributes.GetResource(), tkeAttributes.GetName())
+		if strings.HasPrefix(username, "system") && tenantID == "" {
+			handler.ServeHTTP(w, req)
+			return
+		}
 		reason, valid := CheckClustersTenant(ctx, tenantID, clusterNames, i.platformClient, verb)
 		if !valid {
 			ForbiddenResponse(ctx, tkeAttributes, w, req, ae, c.Serializer, reason)
